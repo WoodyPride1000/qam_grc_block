@@ -39,18 +39,18 @@ class GrayCoder:
     def from_gray(self, vals):
         """
         Convert Gray-coded values to binary indices.
-        
+    
         Args:
             vals (np.ndarray or int): Gray-coded values.
-        
+    
         Returns:
             np.ndarray or int: Binary indices.
         """
         vals = np.array(vals) & self.mask
-        b = vals
+        b = vals 
         shift = 1
         while shift < self.bits:
-            b ^= (vals >> shift)
+            b ^= (b >> shift)  # ここをbにするのが正解
             shift <<= 1
         return b
 
