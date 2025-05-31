@@ -13,7 +13,7 @@ class GrayCoder:
         Initialize GrayCoder with QAM size.
         
         Args:
-            qam_size (int): QAM constellation size (e.g., 64, 128).
+            qam_size (int): QAM constellation size (e.g., 16, 64, 128, 256).
         
         Raises:
             ValueError: If qam_size is not a power of 2.
@@ -59,26 +59,28 @@ def generate_constellation(qam_size):
     Generate normalized QAM constellation points.
 
     Args:
-        qam_size (int): QAM constellation size (64 or 128).
+        qam_size (int): QAM constellation size (16, 64, 128, or 256).
 
     Returns:
         np.ndarray: Complex constellation points normalized to unit average power.
 
     Raises:
-        ValueError: If QAM size is not 64 or 128.
+        ValueError: If QAM size is not 16, 64, 128, or 256.
     """
-    if qam_size not in [64, 128]:
+    if qam_size not in [16, 64, 128, 256]:
         raise ValueError(f"Unsupported QAM size: {qam_size}")
 
-    if qam_size == 64:
-        points_per_axis = 8
-        coords = np.arange(-points_per_axis + 1, points_per_axis, 2)
-        I, Q = np.meshgrid(coords, coords)
-        points = I.flatten() + 1j * Q.flatten()
-    else:  # qam_size == 128
+    if qam_size == 128:
+        # QAM-128: 8x16グリッド（I軸8点、Q軸16点）
         coords_i = np.arange(-7, 8, 2)  # 8 points for I-axis
         coords_q = np.arange(-15, 16, 2)  # 16 points for Q-axis
         I, Q = np.meshgrid(coords_i, coords_q)
+        points = I.flatten() + 1j * Q.flatten()
+    else:
+        # QAM-16 (4x4), QAM-64 (8x8), QAM-256 (16x16)
+        points_per_axis = int(np.sqrt(qam_size))
+        coords = np.arange(-points_per_axis + 1, points_per_axis, 2)
+        I, Q = np.meshgrid(coords, coords)
         points = I.flatten() + 1j * Q.flatten()
 
     avg_power = np.mean(np.abs(points)**2)
