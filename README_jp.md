@@ -128,7 +128,7 @@ GRCでフローを実行し、コンスタレーション図を確認。
 
 範囲外の入力値（例: 64以上の値）は0jにマッピングされ、ログに警告が出力。
 
-## 9. **エラーハンドリング**
+## 9. **エラーハンドリング**:
 無効なQAMサイズ: qam_sizeが64または128以外の場合は、ValueErrorが発生。
 
 無効な入力値: 入力値が0未満またはqam_size以上の場合、0jを出力し、警告ログを記録。
@@ -136,4 +136,64 @@ GRCでフローを実行し、コンスタレーション図を確認。
 コンスタレーションエラー: generate_constellationが期待するサイズの配列を返さない場合、ValueErrorが発生。
 
 
+## 10. **パフォーマンス**:
+効率性: NumPyベクトル化により、大量データの処理を高速化。
+
+メモリ: コンスタレーションはqam_sizeに応じたサイズ（64または128のcomplex64配列）で、メモリ使用量は最小限。
+
+ログ: 無効な入力値を検出時にlogging.warningで記録し、デバッグを支援。
+
+## 11. **制限と拡張**:
+制限:
+現在の実装はQAM-64およびQAM-128のみサポート。
+
+QAM-128は8x16グリッドを採用（DVB-T2や5G NRに準拠）。他の配置（例: 12x12）は未サポート。
+
+拡張の可能性:
+16-QAMや256-QAMをサポートするには、generate_constellationを一般化（points_per_axis = int(np.sqrt(qam_size))）。
+
+他のグレイコード方式（例: 非標準のビット配置）に対応する場合は、GrayCoderを拡張。
+
+## 12. **テスト**:
+以下の単体テストで機能を確認できます（test_qam_mapper.py）：
+
+
+```python
+
+import numpy as np
+import unittest
+from utils import generate_constellation, GrayCoder
+
+class TestQAMMapper(unittest.TestCase):
+    def test_generate_constellation(self):
+        points = generate_constellation(64)
+        self.assertEqual(len(points), 64)
+        self.assertAlmostEqual(np.mean(np.abs(points)**2), 1.0, delta=1e-6)
+        
+        points = generate_constellation(128)
+        self.assertEqual(len(points), 128)
+        self.assertAlmostEqual(np.mean(np.abs(points)**2), 1.0, delta=1e-6)
+
+    def test_gray_coder(self):
+        coder = GrayCoder(64)
+        vals = np.array([0, 1, 2, 3])
+        gray_vals = coder.to_gray(vals)  # [0, 1, 3, 2]
+        self.assertTrue(np.array_equal(gray_vals, [0, 1, 3, 2]))
+        binary_vals = coder.from_gray(gray_vals)
+        self.assertTrue(np.array_equal(binary_vals, vals))
+
+    def test_invalid_qam_size(self):
+        with self.assertRaises(ValueError):
+            generate_constellation(32)
+
+if __name__ == '__main__':
+    unittest.main()
+```
+
+## 13. **注意事項**:
+ログの確認: 無効な入力値が検出された場合、ログファイルまたはコンソールに警告が出力されます。
+
+規格準拠: QAM-128は8x16グリッドを使用。特定の規格（例: IEEE 802.11）で異なる配置が必要な場合は、generate_constellationを調整。
+
+依存ファイル: utils.pyが正しく配置されていない場合、インポートエラーが発生します。
 
