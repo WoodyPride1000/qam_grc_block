@@ -34,6 +34,16 @@ architecture behavioral of qam_mapper_tb is
         );
     end component;
 
+    -- グレイコード変換関数
+    function to_gray(binary : integer; bit_width : integer) return integer is
+        variable bin : unsigned(7 downto 0);
+        variable gray : unsigned(7 downto 0);
+    begin
+        bin := to_unsigned(binary, 8);
+        gray := bin xor shift_right(bin, 1);
+        return to_integer(gray(bit_width-1 downto 0));
+    end function;
+
 begin
     -- クロック生成
     clk_process: process
@@ -80,6 +90,7 @@ begin
         procedure test_qam(
             qam_size_val  : in  std_logic_vector(1 downto 0);
             qam_size_int  : in  integer;
+            bit_width     : in  integer;
             enable_gray   : in  std_logic;
             test_name     : in  string
         ) is
@@ -94,13 +105,17 @@ begin
                 if i = 0 or i = qam_size_int - 1 or i = qam_size_int / 2 then
                     gray_index := i;
                     if enable_gray = '1' then
-                        -- グレイコード変換（簡略化のため、PythonのGrayCoder.to_grayを模倣）
-                        gray_index := i xor (i / 2);  -- 実際は別途計算
+                        gray_index := to_gray(i, bit_width);
                     end if;
                     data_in <= std_logic_vector(to_unsigned(gray_index, 8));
                     if qam_size_val = "00" then
                         check_output(i, qam_size_val, EXPECTED_QAM_16_I(i), EXPECTED_QAM_16_Q(i), '0', test_name);
-                    -- QAM-64, 128, 256も同様に処理（省略）
+                    elsif qam_size_val = "01" then
+                        check_output(i, qam_size_val, EXPECTED_QAM_64_I(i), EXPECTED_QAM_64_Q(i), '0', test_name);
+                    elsif qam_size_val = "10" then
+                        check_output(i, qam_size_val, EXPECTED_QAM_128_I(i), EXPECTED_QAM_128_Q(i), '0', test_name);
+                    elsif qam_size_val = "11" then
+                        check_output(i, qam_size_val, EXPECTED_QAM_256_I(i), EXPECTED_QAM_256_Q(i), '0', test_name);
                     end if;
                 end if;
             end loop;
@@ -124,20 +139,20 @@ begin
         check_output(0, "00", to_signed(0, 16), to_signed(0, 16), '0', "Reset state");
 
         -- QAM-16テスト
-        test_qam("00", 16, '1', "QAM-16 Gray");
-        test_qam("00", 16, '0', "QAM-16 No Gray");
+        test_qam("00", 16, 4, '1', "QAM-16 Gray");
+        test_qam("00", 16, 4, '0', "QAM-16 No Gray");
 
         -- QAM-64テスト
-        test_qam("01", 64, '1', "QAM-64 Gray");
-        test_qam("01", 64, '0', "QAM-64 No Gray");
+        test_qam("01", 64, 6, '1', "QAM-64 Gray");
+        test_qam("01", 64, 6, '0', "QAM-64 No Gray");
 
         -- QAM-128テスト
-        test_qam("10", 128, '1', "QAM-128 Gray");
-        test_qam("10", 128, '0', "QAM-128 No Gray");
+        test_qam("10", 128, 7, '1', "QAM-128 Gray");
+        test_qam("10", 128, 7, '0', "QAM-128 No Gray");
 
         -- QAM-256テスト
-        test_qam("11", 256, '1', "QAM-256 Gray");
-        test_qam("11", 256, '0', "QAM-256 No Gray");
+        test_qam("11", 256, 8, '1', "QAM-256 Gray");
+        test_qam("11", 256, 8, '0', "QAM-256 No Gray");
 
         wait for CLK_PERIOD * 10;
         assert false report "Test completed" severity note;
