@@ -1,44 +1,69 @@
-import numpy as np
+<block>
+    <name>QAM Mapper</name>
+    <key>qam_mapper</key>
+    <category>Modulation</category>
+    <import>import numpy as np</import>
+    <import>from gnuradio import gr</import>
+    <import>from utils import generate_constellation</import>
 
-def generate_constellation(qam_size):
+    <param>
+        <key>qam_size</key>
+        <type>int</type>
+        <default>128</default>
+        <label>QAM Size</label>
+        <description>QAM constellation size (64 or 128)</description>
+    </param>
+
+    <param>
+        <key>enable_gray_map</key>
+        <type>bool</type>
+        <default>True</default>
+        <label>Enable Gray Mapping</label>
+        <description>Enable Gray mapping on symbols</description>
+    </param>
+
+    <input>unsigned char</input>
+    <output>complex float</output>
+
+    <make_block>
+        <![CDATA[
+from gnuradio import gr
+
+class blk(gr.sync_block):
     """
-    Generate normalized QAM constellation points.
-
-    Args:
-        qam_size (int): 64 or 128.
-
-    Returns:
-        np.ndarray: Complex constellation points normalized to unit average power.
-
-    Raises:
-        ValueError: Unsupported QAM size.
+    QAM Mapper block with configurable QAM size and Gray mapping.
     """
-    if qam_size == 64:
-        points_per_axis = 8
-    elif qam_size == 128:
-        points_per_axis = 12
-    else:
-        raise ValueError(f"Unsupported QAM size: {qam_size}")
+    def __init__(self, qam_size=128, enable_gray_map=True):
+        gr.sync_block.__init__(self,
+            name="QAM Mapper",
+            in_sig=[np.uint8],
+            out_sig=[np.complex64])
+        self.qam_size = qam_size
+        self.enable_gray_map = enable_gray_map
+        self.constellation = generate_constellation(self.qam_size)
 
-    coords = [2*x - points_per_axis + 1 for x in range(points_per_axis)]
-    points = [complex(i, q) for i in coords for q in coords]
+    def inverse_gray_map(self, val):
+        b = val
+        shift = 1
+        while shift < 8:
+            b ^= (b >> shift)
+            shift <<= 1
+        return b
 
-    if qam_size == 128:
-        points.sort(key=lambda p: abs(p))
-        points = points[:128]
+    def work(self, input_items, output_items):
+        in0 = input_items[0]
+        out = output_items[0]
 
-    avg_power = np.mean([abs(p)**2 for p in points])
-    norm_points = np.array(points) / np.sqrt(avg_power)
-    return norm_points
+        for i, val in enumerate(in0):
+            val = int(val)
+            if val < 0 or val >= self.qam_size:
+                out[i] = 0j
+                continue
+            if self.enable_gray_map:
+                val = self.inverse_gray_map(val)
+            out[i] = self.constellation[val]
 
-def gray_map(val):
-    """
-    Convert binary index to Gray code.
-
-    Args:
-        val (int): Binary index.
-
-    Returns:
-        int: Gray code value.
-    """
-    return val ^ (val >> 1)
+        return len(in0)
+        ]]>
+    </make_block>
+</block>
