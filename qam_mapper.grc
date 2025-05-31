@@ -4,7 +4,8 @@
     <category>Modulation</category>
     <import>import numpy as np</import>
     <import>from gnuradio import gr</import>
-    <import>from utils import generate_constellation</import>
+    <import>import logging</import>
+    <import>from utils import generate_constellation, GrayCoder</import>
 
     <param>
         <key>qam_size</key>
@@ -27,42 +28,63 @@
 
     <make_block>
         <![CDATA[
+import numpy as np
+import logging
 from gnuradio import gr
+from utils import generate_constellation, GrayCoder
 
 class blk(gr.sync_block):
     """
     QAM Mapper block with configurable QAM size and Gray mapping.
+    
+    Maps input bytes (uint8) to complex QAM constellation points.
+    Supports QAM-64 (8x8) and QAM-128 (8x16) with optional Gray coding.
     """
     def __init__(self, qam_size=128, enable_gray_map=True):
-        gr.sync_block.__init__(self,
+        if qam_size not in [64, 128]:
+            raise ValueError("QAM size must be 64 or 128")
+        gr.sync_block.__init__(
+            self,
             name="QAM Mapper",
             in_sig=[np.uint8],
-            out_sig=[np.complex64])
+            out_sig=[np.complex64]
+        )
         self.qam_size = qam_size
         self.enable_gray_map = enable_gray_map
         self.constellation = generate_constellation(self.qam_size)
-
-    def inverse_gray_map(self, val):
-        b = val
-        shift = 1
-        while shift < 8:
-            b ^= (b >> shift)
-            shift <<= 1
-        return b
+        self.gray_coder = GrayCoder(self.qam_size)
+        
+        if len(self.constellation) != self.qam_size:
+            raise ValueError(f"Invalid constellation size: expected {self.qam_size}, got {len(self.constellation)}")
 
     def work(self, input_items, output_items):
+        """
+        Process input bytes and map to QAM constellation points.
+        
+        Args:
+            input_items: Array of uint8 input values.
+            output_items: Array to store complex64 output values.
+        
+        Returns:
+            int: Number of processed input items.
+        """
         in0 = input_items[0]
         out = output_items[0]
-
-        for i, val in enumerate(in0):
-            val = int(val)
-            if val < 0 or val >= self.qam_size:
-                out[i] = 0j
-                continue
-            if self.enable_gray_map:
-                val = self.inverse_gray_map(val)
-            out[i] = self.constellation[val]
-
+        
+        # 入力値の範囲チェック
+        valid_mask = (in0 >= 0) & (in0 < self.qam_size)
+        if not np.all(valid_mask):
+            logging.warning(f"Invalid input values detected: {in0[~valid_mask]}")
+        out[~valid_mask] = 0j  # 無効な値は0jに設定
+        
+        # グレイマッピング適用
+        mapped_vals = in0[valid_mask]
+        if self.enable_gray_map:
+            mapped_vals = self.gray_coder.from_gray(mapped_vals)
+        
+        # コンスタレーションにマッピング
+        out[valid_mask] = self.constellation[mapped_vals]
+        
         return len(in0)
         ]]>
     </make_block>
